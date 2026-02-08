@@ -3,26 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NFC Pranks</title>
+    <title>NFC Pranks System</title>
     <style>
-        body { background: #000; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; overflow: hidden; }
-        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.98); display: flex; align-items: center; justify-content: center; z-index: 9999; cursor: pointer; }
-        #overlay h2 { color: #ff0000; text-align: center; animation: blink 1s infinite; font-size: 24px; pointer-events: none; }
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.2; } 100% { opacity: 1; } }
-        #mainImage { max-width: 90%; max-height: 70vh; display: none; border-radius: 10px; }
-        h1 { margin-top: 20px; color: #333; font-size: 14px; }
+        body { 
+            background: #000; 
+            color: #fff; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            margin: 0; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            overflow: hidden; 
+        }
+        #overlay { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: rgba(0,0,0,0.98); 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            z-index: 9999; 
+            cursor: pointer; 
+        }
+        #overlay h2 { 
+            color: #ff0000; 
+            text-align: center; 
+            animation: blink 1.2s infinite; 
+            font-size: 26px; 
+            line-height: 1.5;
+            pointer-events: none; 
+        }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.1; } 100% { opacity: 1; } }
+        
+        #mainImage { 
+            max-width: 90%; 
+            max-height: 75vh; 
+            display: none; 
+            border: 2px solid #222;
+            border-radius: 15px; 
+            box-shadow: 0 0 20px rgba(255,0,0,0.2);
+        }
+        h1 { 
+            margin-top: 25px; 
+            color: #222; 
+            font-size: 12px; 
+            letter-spacing: 2px;
+        }
     </style>
 </head>
 <body>
+
     <div id="overlay" onclick="startSystem()">
-        <h2>НАЖМИ НА ЭКРАН!<br><br>👇</h2>
+        <h2>СИСТЕМА ГОТОВА<br>НАЖМИ НА ЭКРАН ДЛЯ ЗАПУСКА<br><br>👇</h2>
     </div>
     
-    <img id="mainImage" src="kenko.png" alt="Prank Image">
-    <h1>@NFC_Pranks_bot</h1>
+    <img id="mainImage" src="kenko.png" alt="Media content">
+    
+    <h1>NFC_PRANKS_CONTROL</h1>
 
     <script>
-        const socketUrl = 'ws://localhost:3000'; 
+        // Твой актуальный адрес туннеля
+        const socketUrl = 'wss://bumpy-lights-shout.loca.lt'; 
         
         let sounds = {
             custom: new Audio(),
@@ -32,42 +78,70 @@
         sounds.vzriv.loop = true;
 
         function startSystem() {
+            // Прячем оверлей и показываем картинку
             document.getElementById('overlay').style.display = 'none';
             document.getElementById('mainImage').style.display = 'block';
             
+            // "Разблокируем" звуки (воспроизводим тишину)
             Object.values(sounds).forEach(a => {
                 a.play().then(() => a.pause()).catch(() => {});
             });
+            
+            console.log("Система активирована. Подключаюсь к серверу...");
             connect();
         }
 
         function connect() {
             const socket = new WebSocket(socketUrl);
             
+            socket.onopen = () => {
+                console.log("Успешное подключение к туннелю!");
+            };
+
             socket.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                
-                if (data.type === 'play_custom') { 
-                    if(sounds.custom.src) playAudio(sounds.custom);
-                } else if (data.type === 'play_deton') { 
-                    playAudio(sounds.deton);
-                } else if (data.type === 'toggle_vzriv') { 
-                    sounds.vzriv.paused ? playAudio(sounds.vzriv) : sounds.vzriv.pause();
-                } else if (data.type === 'stop') { 
-                    Object.values(sounds).forEach(a => { a.pause(); a.currentTime = 0; });
-                } else if (data.type === 'img') { 
-                    document.getElementById('mainImage').src = data.url;
-                } else if (data.type === 'change_sound') { 
-                    sounds.custom.src = data.new_sound_url;
-                    sounds.custom.load();
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log("Получена команда:", data.type);
+
+                    if (data.type === 'play_custom') { 
+                        if(sounds.custom.src) playAudio(sounds.custom);
+                    } 
+                    else if (data.type === 'play_deton') { 
+                        playAudio(sounds.deton);
+                    } 
+                    else if (data.type === 'toggle_vzriv') { 
+                        sounds.vzriv.paused ? playAudio(sounds.vzriv) : sounds.vzriv.pause();
+                    } 
+                    else if (data.type === 'stop') { 
+                        Object.values(sounds).forEach(a => { a.pause(); a.currentTime = 0; });
+                    } 
+                    else if (data.type === 'img') { 
+                        document.getElementById('mainImage').src = data.url;
+                    } 
+                    else if (data.type === 'change_sound') { 
+                        sounds.custom.src = data.new_sound_url;
+                        sounds.custom.load();
+                    }
+                } catch (e) {
+                    console.error("Ошибка обработки данных:", e);
                 }
             };
 
-            socket.onclose = () => setTimeout(connect, 2000);
+            socket.onerror = (error) => {
+                console.error("Ошибка WebSocket. Проверь, запущен ли lt и main.py");
+            };
+
+            socket.onclose = () => {
+                console.log("Соединение разорвано. Переподключение через 3 секунды...");
+                setTimeout(connect, 3000);
+            };
         }
 
         function playAudio(a) {
-            if (a.src) a.play().catch(() => {});
+            if (a.src && a.src !== window.location.href) {
+                a.currentTime = 0;
+                a.play().catch(err => console.log("Ошибка звука:", err));
+            }
         }
     </script>
 </body>
