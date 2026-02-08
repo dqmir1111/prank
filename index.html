@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFC Pranks</title>
+    <style>
+        body { background: #000; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; overflow: hidden; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.98); display: flex; align-items: center; justify-content: center; z-index: 9999; cursor: pointer; }
+        #overlay h2 { color: #ff0000; text-align: center; animation: blink 1s infinite; font-size: 24px; pointer-events: none; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.2; } 100% { opacity: 1; } }
+        #mainImage { max-width: 90%; max-height: 70vh; display: none; border-radius: 10px; }
+        h1 { margin-top: 20px; color: #333; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div id="overlay" onclick="startSystem()">
+        <h2>НАЖМИ НА ЭКРАН!<br><br>👇</h2>
+    </div>
+    
+    <img id="mainImage" src="kenko.png" alt="Prank Image">
+    <h1>@NFC_Pranks_bot</h1>
+
+    <script>
+        const socketUrl = 'ws://localhost:3000'; 
+        
+        let sounds = {
+            custom: new Audio(),
+            deton: new Audio('deton.mp3'),
+            vzriv: new Audio('vzriv.mp3')
+        };
+        sounds.vzriv.loop = true;
+
+        function startSystem() {
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('mainImage').style.display = 'block';
+            
+            Object.values(sounds).forEach(a => {
+                a.play().then(() => a.pause()).catch(() => {});
+            });
+            connect();
+        }
+
+        function connect() {
+            const socket = new WebSocket(socketUrl);
+            
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'play_custom') { 
+                    if(sounds.custom.src) playAudio(sounds.custom);
+                } else if (data.type === 'play_deton') { 
+                    playAudio(sounds.deton);
+                } else if (data.type === 'toggle_vzriv') { 
+                    sounds.vzriv.paused ? playAudio(sounds.vzriv) : sounds.vzriv.pause();
+                } else if (data.type === 'stop') { 
+                    Object.values(sounds).forEach(a => { a.pause(); a.currentTime = 0; });
+                } else if (data.type === 'img') { 
+                    document.getElementById('mainImage').src = data.url;
+                } else if (data.type === 'change_sound') { 
+                    sounds.custom.src = data.new_sound_url;
+                    sounds.custom.load();
+                }
+            };
+
+            socket.onclose = () => setTimeout(connect, 2000);
+        }
+
+        function playAudio(a) {
+            if (a.src) a.play().catch(() => {});
+        }
+    </script>
+</body>
+</html>
