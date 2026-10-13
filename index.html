@@ -168,15 +168,16 @@
     // 1. Конфигурация Firebase
     // Если база создана в европейском регионе, URL может выглядеть как:
     // https://xrayrl-912a2-default-rtdb.europe-west1.firebasedatabase.app
-    const firebaseConfig = {
-      apiKey: "AIzaSyBFWbnD0ImRWDQuawuiGrFElLuB13oZb6w",
-      authDomain: "xrayrl-912a2.firebaseapp.com",
-      databaseURL: "https://xrayrl-912a2-default-rtdb.firebaseio.com",
-      projectId: "xrayrl-912a2",
-      storageBucket: "xrayrl-912a2.firebasestorage.app",
-      messagingSenderId: "667937765086",
-      appId: "1:667937765086:web:89a016ba667f220b2db44f"
-    };
+const firebaseConfig = {
+  apiKey: "AIzaSyBFWbnD0ImRWDQuawuiGrFElLuB13oZb6w",
+  authDomain: "xrayrl-912a2.firebaseapp.com",
+  databaseURL: "https://xrayrl.firebaseio.com",
+  projectId: "xrayrl-912a2",
+  storageBucket: "xrayrl-912a2.firebasestorage.app",
+  messagingSenderId: "667937765086",
+  appId: "1:667937765086:web:89a016ba667f220b2db44f",
+  measurementId: "G-6QLN718QSF"
+};
 
     if (!firebase.apps.length) {
       firebase.initializeApp(firebaseConfig);
