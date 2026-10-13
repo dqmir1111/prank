@@ -1,152 +1,404 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@NFC_Pranks_bot</title>
-    <style>
-        body { 
-            background: #000; 
-            color: #fff; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            height: 100vh; 
-            margin: 0; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            overflow: hidden; 
-        }
-        #overlay { 
-            position: fixed; 
-            top: 0; 
-            left: 0; 
-            width: 100%; 
-            height: 100%; 
-            background: rgba(0,0,0,0.98); 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            z-index: 9999; 
-            cursor: pointer; 
-        }
-        #overlay h2 { 
-            color: #ff0000; 
-            text-align: center; 
-            animation: blink 1.2s infinite; 
-            font-size: 26px; 
-            line-height: 1.5;
-            pointer-events: none; 
-        }
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.1; } 100% { opacity: 1; } }
-        
-        #mainImage { 
-            max-width: 90%; 
-            max-height: 75vh; 
-            display: none; 
-            border: 2px solid #222;
-            border-radius: 15px; 
-            box-shadow: 0 0 20px rgba(255,0,0,0.2);
-        }
-        h1 { 
-            margin-top: 25px; 
-            color: #222; 
-            font-size: 12px; 
-            letter-spacing: 2px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>X-Ray RealLife</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    body {
+      background: #121212;
+      color: #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+    header {
+      width: 100%;
+      max-width: 720px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #fff;
+    }
+    .badge {
+      font-size: 0.8rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: #2a2a2a;
+      color: #bbb;
+    }
+    .badge.active { background: #1b5e20; color: #a5d6a7; }
+    .badge.wall { background: #b71c1c; color: #ffcdd2; }
+
+    .card {
+      background: #1e1e1e;
+      border: 1px solid #2e2e2e;
+      border-radius: 8px;
+      padding: 16px;
+      width: 100%;
+      max-width: 720px;
+      margin-bottom: 14px;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    input, select, button {
+      background: #2b2b2b;
+      border: 1px solid #3d3d3d;
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      outline: none;
+    }
+    input:focus, select:focus {
+      border-color: #555;
+    }
+    button {
+      cursor: pointer;
+      font-weight: 500;
+      background: #333;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #444;
+    }
+    button.primary {
+      background: #2563eb;
+      border-color: #1d4ed8;
+    }
+    button.primary:hover {
+      background: #1d4ed8;
+    }
+
+    .viewport {
+      position: relative;
+      width: 100%;
+      max-width: 720px;
+      aspect-ratio: 4 / 3;
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #2e2e2e;
+    }
+    video, canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    canvas {
+      z-index: 2;
+    }
+    .overlay-info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 3;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      pointer-events: none;
+    }
+  </style>
+
+  <!-- Firebase App & Realtime Database SDK (v8) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+  <!-- MediaPipe Pose -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
 </head>
 <body>
 
-    <div id="overlay" onclick="startSystem()">
-        <h2>@NFC_Pranks_bot<br>НАЖМИ НА ЭКРАН ДЛЯ ЗАПУСКА<br><br>👇</h2>
+  <header>
+    <h1>X-Ray RealLife</h1>
+    <div id="statusBadge" class="badge">Ожидание запуска</div>
+  </header>
+
+  <div class="card">
+    <div class="controls">
+      <label>Комната / Код:</label>
+      <input type="text" id="roomInput" value="room-1" style="width: 110px;">
+
+      <label>Устройство:</label>
+      <select id="roleSelect">
+        <option value="cam1">Камера 1 (Экран / Первая комната)</option>
+        <option value="cam2">Камера 2 (Датчик за стенкой)</option>
+      </select>
+
+      <button id="startBtn" class="primary">Запустить</button>
+      <button id="switchCamBtn" style="display:none;">Сменить камеру</button>
     </div>
-    
-    <img id="mainImage" src="kenko.png" alt="Media content">
-    
-    <h1>@NFC_Pranks_bot</h1>
+  </div>
 
-    <script>
-        // Твой новый адрес туннеля
-const socketUrl = 'wss://curly-peas-think.loca.lt';
-        
-        let sounds = {
-            custom: new Audio(),
-            deton: new Audio('deton.mp3'),
-            vzriv: new Audio('vzriv.mp3')
-        };
-        sounds.vzriv.loop = true;
+  <div class="viewport">
+    <div id="overlayInfo" class="overlay-info">Камера выключена</div>
+    <video id="videoElement" playsinline autoplay muted></video>
+    <canvas id="canvasElement"></canvas>
+  </div>
 
-        function startSystem() {
-            // Прячем оверлей и показываем картинку
-            document.getElementById('overlay').style.display = 'none';
-            document.getElementById('mainImage').style.display = 'block';
-            
-            // "Разблокируем" звуки (воспроизводим тишину)
-            Object.values(sounds).forEach(a => {
-                a.play().then(() => a.pause()).catch(() => {});
-            });
-            
-            console.log("Система активирована. Подключаюсь к серверу...");
-            connect();
+  <script>
+    // Конфигурация Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyBFWbnD0ImRWDQuawuiGrFElLuB13oZb6w",
+      authDomain: "xrayrl-912a2.firebaseapp.com",
+      databaseURL: "https://xrayrl-912a2-default-rtdb.firebaseio.com",
+      projectId: "xrayrl-912a2",
+      storageBucket: "xrayrl-912a2.firebasestorage.app",
+      messagingSenderId: "667937765086",
+      appId: "1:667937765086:web:89a016ba667f220b2db44f",
+      measurementId: "G-6QLN718QSF"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const videoElement = document.getElementById('videoElement');
+    const canvasElement = document.getElementById('canvasElement');
+    const ctx = canvasElement.getContext('2d');
+    const startBtn = document.getElementById('startBtn');
+    const roleSelect = document.getElementById('roleSelect');
+    const roomInput = document.getElementById('roomInput');
+    const statusBadge = document.getElementById('statusBadge');
+    const overlayInfo = document.getElementById('overlayInfo');
+    const switchCamBtn = document.getElementById('switchCamBtn');
+
+    let currentRole = 'cam1';
+    let roomCode = 'room-1';
+    let poseTracker = null;
+    let cameraStream = null;
+    let facingMode = 'environment';
+    let lastCam2Data = null;
+    let lastSendTime = 0;
+    let remoteListenerRef = null;
+
+    // Соединения для отрисовки силуэта
+    const POSE_CONNECTIONS = [
+      [11, 12], // плечи
+      [11, 13], [13, 15], // левая рука
+      [12, 14], [14, 16], // правая рука
+      [11, 23], [12, 24], // туловище
+      [23, 24], // таз
+      [23, 25], [25, 27], [27, 29], [29, 31], // левая нога
+      [24, 26], [26, 28], [28, 30], [30, 32]  // правая нога
+    ];
+
+    async function initCamera() {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: facingMode,
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          },
+          audio: false
+        });
+        videoElement.srcObject = cameraStream;
+        await new Promise(r => videoElement.onloadedmetadata = r);
+        videoElement.play();
+        switchCamBtn.style.display = 'inline-block';
+      } catch (err) {
+        alert("Ошибка доступа к камере: " + err.message);
+      }
+    }
+
+    switchCamBtn.addEventListener('click', async () => {
+      facingMode = facingMode === 'user' ? 'environment' : 'user';
+      await initCamera();
+    });
+
+    function setupMediaPipe() {
+      poseTracker = new Pose({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+      });
+
+      poseTracker.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        enableSegmentation: false,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+
+      poseTracker.onResults(onPoseResults);
+    }
+
+    async function detectionLoop() {
+      if (videoElement.readyState >= 2) {
+        await poseTracker.send({ image: videoElement });
+      }
+      requestAnimationFrame(detectionLoop);
+    }
+
+    function onPoseResults(results) {
+      canvasElement.width = videoElement.videoWidth || 640;
+      canvasElement.height = videoElement.videoHeight || 480;
+      ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+      const hasLocalPerson = results.poseLandmarks && results.poseLandmarks.length > 0;
+
+      if (currentRole === 'cam2') {
+        // Камера 2 — сенсор за стеной. Стримит координаты в Realtime Database
+        if (hasLocalPerson) {
+          drawSkeleton(results.poseLandmarks, '#ffffff', 2);
+          overlayInfo.innerText = "Камера 2: Человек за стеной обнаружен (передача)";
+          statusBadge.innerText = "Сенсор: передача";
+          statusBadge.className = "badge active";
+
+          sendPoseToFirebase(results.poseLandmarks);
+        } else {
+          overlayInfo.innerText = "Камера 2: В комнате никого нет";
+          statusBadge.innerText = "Сенсор: ожидание";
+          statusBadge.className = "badge";
+          clearPoseInFirebase();
         }
-
-        function connect() {
-            const socket = new WebSocket(socketUrl);
-            
-            socket.onopen = () => {
-                console.log("Успешное подключение к туннелю!");
-            };
-
-            socket.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    console.log("Получена команда:", data.type);
-
-                    if (data.type === 'play_custom') { 
-                        if(sounds.custom.src) playAudio(sounds.custom);
-                    } 
-                    else if (data.type === 'play_deton') { 
-                        playAudio(sounds.deton);
-                    } 
-                    else if (data.type === 'toggle_vzriv') { 
-                        sounds.vzriv.paused ? playAudio(sounds.vzriv) : sounds.vzriv.pause();
-                    } 
-                    else if (data.type === 'stop') { 
-                        Object.values(sounds).forEach(a => { a.pause(); a.currentTime = 0; });
-                    } 
-                    else if (data.type === 'img') { 
-                        document.getElementById('mainImage').src = data.url;
-                    } 
-                    else if (data.type === 'change_sound') { 
-                        sounds.custom.src = data.new_sound_url;
-                        sounds.custom.load();
-                    }
-                } catch (e) {
-                    console.error("Ошибка обработки данных:", e);
-                }
-            };
-
-            socket.onerror = (error) => {
-                console.error("Ошибка WebSocket. Проверь, запущен ли lt и main.py");
-            };
-
-            socket.onclose = () => {
-                console.log("Соединение разорвано. Переподключение через 3 секунды...");
-                setTimeout(connect, 3000);
-            };
+      } else {
+        // Камера 1 — экран в первой комнате
+        if (hasLocalPerson) {
+          // Человек в первой комнате
+          drawSkeleton(results.poseLandmarks, '#4caf50', 2.5);
+          overlayInfo.innerText = "Камера 1: Человек в комнате 1";
+          statusBadge.innerText = "В поле зрения";
+          statusBadge.className = "badge active";
+        } else {
+          // Человек ушел из первой комнаты — проверяем вторую комнату из Firebase
+          if (lastCam2Data && (Date.now() - lastCam2Data.timestamp < 2500) && lastCam2Data.landmarks) {
+            // Рисуем силуэт человека за стенкой
+            drawSkeleton(lastCam2Data.landmarks, '#ff5252', 3, true);
+            overlayInfo.innerText = "Камера 1: Человек за стеной (Камера 2)";
+            statusBadge.innerText = "За стенкой";
+            statusBadge.className = "badge wall";
+          } else {
+            overlayInfo.innerText = "Камера 1: Людей нет";
+            statusBadge.innerText = "Поиск";
+            statusBadge.className = "badge";
+          }
         }
+      }
+    }
 
-        function playAudio(a) {
-            if (a.src && a.src !== window.location.href) {
-                a.currentTime = 0;
-                a.play().catch(err => console.log("Ошибка звука:", err));
-            }
+    // Отправка легкого набора координат в Realtime Database (~20 FPS)
+    function sendPoseToFirebase(landmarks) {
+      const now = Date.now();
+      if (now - lastSendTime < 50) return;
+      lastSendTime = now;
+
+      // Берем основные ключевые точки, округляя до 3 знаков
+      const compressed = landmarks.map(pt => ({
+        x: Math.round(pt.x * 1000) / 1000,
+        y: Math.round(pt.y * 1000) / 1000,
+        v: Math.round((pt.visibility || 0) * 100) / 100
+      }));
+
+      db.ref(`rooms/${roomCode}/cam2`).set({
+        landmarks: compressed,
+        timestamp: now
+      });
+    }
+
+    function clearPoseInFirebase() {
+      const now = Date.now();
+      if (now - lastSendTime < 300) return;
+      lastSendTime = now;
+      db.ref(`rooms/${roomCode}/cam2`).set({
+        landmarks: null,
+        timestamp: now
+      });
+    }
+
+    function subscribeToCam2() {
+      if (remoteListenerRef) remoteListenerRef.off();
+      remoteListenerRef = db.ref(`rooms/${roomCode}/cam2`);
+      remoteListenerRef.on('value', (snapshot) => {
+        lastCam2Data = snapshot.val();
+      });
+    }
+
+    // Прорисовка линий и суставов силуэта
+    function drawSkeleton(landmarks, color, lineWidth, behindWall = false) {
+      const w = canvasElement.width;
+      const h = canvasElement.height;
+
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = lineWidth;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      if (behindWall) {
+        // Небольшой полупрозрачный ореол для эффекта "сквозь стену"
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 6;
+      }
+
+      // Линии между суставами
+      for (const [start, end] of POSE_CONNECTIONS) {
+        const p1 = landmarks[start];
+        const p2 = landmarks[end];
+        if (p1 && p2 && (p1.v === undefined || p1.v > 0.4) && (p2.v === undefined || p2.v > 0.4)) {
+          ctx.beginPath();
+          ctx.moveTo(p1.x * w, p1.y * h);
+          ctx.lineTo(p2.x * w, p2.y * h);
+          ctx.stroke();
         }
-    </script>
+      }
+
+      // Точки суставов и голова
+      landmarks.forEach((p, index) => {
+        if (p && (p.v === undefined || p.v > 0.4)) {
+          const r = index === 0 ? 7 : 3.5; // голова чуть больше
+          ctx.beginPath();
+          ctx.arc(p.x * w, p.y * h, r, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+      });
+
+      ctx.restore();
+    }
+
+    startBtn.addEventListener('click', async () => {
+      currentRole = roleSelect.value;
+      roomCode = roomInput.value.trim() || 'room-1';
+
+      startBtn.disabled = true;
+      roleSelect.disabled = true;
+      roomInput.disabled = true;
+      statusBadge.innerText = "Инициализация...";
+
+      await initCamera();
+      setupMediaPipe();
+
+      if (currentRole === 'cam1') {
+        subscribeToCam2();
+      }
+
+      requestAnimationFrame(detectionLoop);
+    });
+  </script>
 </body>
 </html>
-
-
-
-
