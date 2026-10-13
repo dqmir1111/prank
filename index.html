@@ -26,31 +26,36 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
     h1 {
-      font-size: 1.25rem;
+      font-size: 1.2rem;
       font-weight: 600;
       color: #fff;
     }
+    .status-group {
+      display: flex;
+      gap: 6px;
+    }
     .badge {
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       padding: 4px 8px;
       border-radius: 4px;
       background: #2a2a2a;
       color: #bbb;
     }
-    .badge.active { background: #1b5e20; color: #a5d6a7; }
-    .badge.wall { background: #b71c1c; color: #ffcdd2; }
+    .badge.green { background: #1b5e20; color: #a5d6a7; }
+    .badge.red { background: #b71c1c; color: #ffcdd2; }
+    .badge.yellow { background: #e65100; color: #ffe0b2; }
 
     .card {
       background: #1e1e1e;
       border: 1px solid #2e2e2e;
       border-radius: 8px;
-      padding: 16px;
+      padding: 14px;
       width: 100%;
       max-width: 720px;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
     .controls {
       display: flex;
@@ -64,27 +69,18 @@
       color: #fff;
       padding: 8px 12px;
       border-radius: 6px;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       outline: none;
     }
-    input:focus, select:focus {
-      border-color: #555;
-    }
+    input:focus, select:focus { border-color: #555; }
     button {
       cursor: pointer;
       font-weight: 500;
       background: #333;
-      transition: background 0.2s;
-    }
-    button:hover {
-      background: #444;
     }
     button.primary {
       background: #2563eb;
       border-color: #1d4ed8;
-    }
-    button.primary:hover {
-      background: #1d4ed8;
     }
 
     .viewport {
@@ -105,23 +101,28 @@
       height: 100%;
       object-fit: cover;
     }
-    canvas {
-      z-index: 2;
-    }
+    canvas { z-index: 2; }
     .overlay-info {
       position: absolute;
       top: 10px;
       left: 10px;
       z-index: 3;
-      background: rgba(0, 0, 0, 0.7);
+      background: rgba(0, 0, 0, 0.75);
       padding: 6px 10px;
       border-radius: 4px;
       font-size: 0.8rem;
       pointer-events: none;
     }
+    .log-box {
+      margin-top: 10px;
+      font-size: 0.75rem;
+      color: #888;
+      width: 100%;
+      max-width: 720px;
+    }
   </style>
 
-  <!-- Firebase App & Realtime Database SDK (v8) -->
+  <!-- Firebase v8 -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -133,22 +134,25 @@
 
   <header>
     <h1>X-Ray RealLife</h1>
-    <div id="statusBadge" class="badge">Ожидание запуска</div>
+    <div class="status-group">
+      <span id="dbBadge" class="badge yellow">БД: подключение...</span>
+      <span id="statusBadge" class="badge">Ожидание</span>
+    </div>
   </header>
 
   <div class="card">
     <div class="controls">
-      <label>Комната / Код:</label>
-      <input type="text" id="roomInput" value="room-1" style="width: 110px;">
+      <label>Комната:</label>
+      <input type="text" id="roomInput" value="room-1" style="width: 90px;">
 
-      <label>Устройство:</label>
+      <label>Роль:</label>
       <select id="roleSelect">
-        <option value="cam1">Камера 1 (Экран / Первая комната)</option>
-        <option value="cam2">Камера 2 (Датчик за стенкой)</option>
+        <option value="cam1">Камера 1 (Экран на стене)</option>
+        <option value="cam2">Камера 2 (Сенсор за стеной)</option>
       </select>
 
       <button id="startBtn" class="primary">Запустить</button>
-      <button id="switchCamBtn" style="display:none;">Сменить камеру</button>
+      <button id="switchCamBtn" style="display:none;">Развернуть камеру</button>
     </div>
   </div>
 
@@ -158,8 +162,12 @@
     <canvas id="canvasElement"></canvas>
   </div>
 
+  <div class="log-box" id="debugLog">Статус: готов к запуску</div>
+
   <script>
-    // Конфигурация Firebase
+    // 1. Конфигурация Firebase
+    // Если база создана в европейском регионе, URL может выглядеть как:
+    // https://xrayrl-912a2-default-rtdb.europe-west1.firebasedatabase.app
     const firebaseConfig = {
       apiKey: "AIzaSyBFWbnD0ImRWDQuawuiGrFElLuB13oZb6w",
       authDomain: "xrayrl-912a2.firebaseapp.com",
@@ -167,54 +175,65 @@
       projectId: "xrayrl-912a2",
       storageBucket: "xrayrl-912a2.firebasestorage.app",
       messagingSenderId: "667937765086",
-      appId: "1:667937765086:web:89a016ba667f220b2db44f",
-      measurementId: "G-6QLN718QSF"
+      appId: "1:667937765086:web:89a016ba667f220b2db44f"
     };
 
-    firebase.initializeApp(firebaseConfig);
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
     const db = firebase.database();
 
+    const dbBadge = document.getElementById('dbBadge');
+    const statusBadge = document.getElementById('statusBadge');
+    const overlayInfo = document.getElementById('overlayInfo');
+    const debugLog = document.getElementById('debugLog');
     const videoElement = document.getElementById('videoElement');
     const canvasElement = document.getElementById('canvasElement');
     const ctx = canvasElement.getContext('2d');
     const startBtn = document.getElementById('startBtn');
     const roleSelect = document.getElementById('roleSelect');
     const roomInput = document.getElementById('roomInput');
-    const statusBadge = document.getElementById('statusBadge');
-    const overlayInfo = document.getElementById('overlayInfo');
     const switchCamBtn = document.getElementById('switchCamBtn');
+
+    // Проверка соединения с базой данных
+    const connectedRef = db.ref(".info/connected");
+    connectedRef.on("value", (snap) => {
+      if (snap.val() === true) {
+        dbBadge.innerText = "БД: онлайн";
+        dbBadge.className = "badge green";
+      } else {
+        dbBadge.innerText = "БД: нет связи";
+        dbBadge.className = "badge red";
+      }
+    });
 
     let currentRole = 'cam1';
     let roomCode = 'room-1';
     let poseTracker = null;
     let cameraStream = null;
     let facingMode = 'environment';
-    let lastCam2Data = null;
-    let lastSendTime = 0;
-    let remoteListenerRef = null;
+    let latestCam2Data = null;
+    let localPersonDetected = false;
+    let lastLocalLandmarks = null;
+    let lastSendTimestamp = 0;
 
-    // Соединения для отрисовки силуэта
     const POSE_CONNECTIONS = [
-      [11, 12], // плечи
-      [11, 13], [13, 15], // левая рука
-      [12, 14], [14, 16], // правая рука
-      [11, 23], [12, 24], // туловище
-      [23, 24], // таз
-      [23, 25], [25, 27], [27, 29], [29, 31], // левая нога
-      [24, 26], [26, 28], [28, 30], [30, 32]  // правая нога
+      [11, 12],
+      [11, 13], [13, 15],
+      [12, 14], [14, 16],
+      [11, 23], [12, 24],
+      [23, 24],
+      [23, 25], [25, 27], [27, 29], [29, 31],
+      [24, 26], [26, 28], [28, 30], [30, 32]
     ];
 
     async function initCamera() {
       if (cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream.getTracks().forEach(t => t.stop());
       }
       try {
         cameraStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: facingMode,
-            width: { ideal: 640 },
-            height: { ideal: 480 }
-          },
+          video: { facingMode: facingMode, width: { ideal: 640 }, height: { ideal: 480 } },
           audio: false
         });
         videoElement.srcObject = cameraStream;
@@ -222,7 +241,7 @@
         videoElement.play();
         switchCamBtn.style.display = 'inline-block';
       } catch (err) {
-        alert("Ошибка доступа к камере: " + err.message);
+        alert("Ошибка камеры: " + err.message);
       }
     }
 
@@ -237,7 +256,7 @@
       });
 
       poseTracker.setOptions({
-        modelComplexity: 1,
+        modelComplexity: 0, // 0 - быстрее для мобильных устройств
         smoothLandmarks: true,
         enableSegmentation: false,
         minDetectionConfidence: 0.5,
@@ -247,99 +266,126 @@
       poseTracker.onResults(onPoseResults);
     }
 
-    async function detectionLoop() {
-      if (videoElement.readyState >= 2) {
+    async function processVideoFrame() {
+      if (videoElement.readyState >= 2 && poseTracker) {
         await poseTracker.send({ image: videoElement });
       }
-      requestAnimationFrame(detectionLoop);
+      requestAnimationFrame(processVideoFrame);
     }
 
     function onPoseResults(results) {
-      canvasElement.width = videoElement.videoWidth || 640;
-      canvasElement.height = videoElement.videoHeight || 480;
-      ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-
-      const hasLocalPerson = results.poseLandmarks && results.poseLandmarks.length > 0;
+      if (results.poseLandmarks && results.poseLandmarks.length > 0) {
+        localPersonDetected = true;
+        lastLocalLandmarks = results.poseLandmarks;
+      } else {
+        localPersonDetected = false;
+        lastLocalLandmarks = null;
+      }
 
       if (currentRole === 'cam2') {
-        // Камера 2 — сенсор за стеной. Стримит координаты в Realtime Database
-        if (hasLocalPerson) {
-          drawSkeleton(results.poseLandmarks, '#ffffff', 2);
-          overlayInfo.innerText = "Камера 2: Человек за стеной обнаружен (передача)";
-          statusBadge.innerText = "Сенсор: передача";
-          statusBadge.className = "badge active";
-
-          sendPoseToFirebase(results.poseLandmarks);
+        if (localPersonDetected) {
+          sendToFirebase(results.poseLandmarks);
+          overlayInfo.innerText = "Камера 2 (Сенсор): Человек обнаружен -> передача в БД";
+          statusBadge.innerText = "Передача";
+          statusBadge.className = "badge green";
         } else {
-          overlayInfo.innerText = "Камера 2: В комнате никого нет";
-          statusBadge.innerText = "Сенсор: ожидание";
+          clearFirebase();
+          overlayInfo.innerText = "Камера 2 (Сенсор): Комната пуста";
+          statusBadge.innerText = "Ожидание";
           statusBadge.className = "badge";
-          clearPoseInFirebase();
+        }
+      }
+    }
+
+    function sendToFirebase(landmarks) {
+      const now = Date.now();
+      if (now - lastSendTimestamp < 60) return; // ~16 FPS для плавной передачи
+      lastSendTimestamp = now;
+
+      // Упрощаем координаты (только нужные поля)
+      const data = landmarks.map(p => ({
+        x: Math.round(p.x * 1000) / 1000,
+        y: Math.round(p.y * 1000) / 1000,
+        v: Math.round((p.visibility || 0) * 100) / 100
+      }));
+
+      db.ref(`rooms/${roomCode}/cam2`).set({
+        landmarks: data,
+        time: now
+      }).catch(err => {
+        debugLog.innerText = "Ошибка записи в Firebase: " + err.message;
+      });
+    }
+
+    function clearFirebase() {
+      const now = Date.now();
+      if (now - lastSendTimestamp < 500) return;
+      lastSendTimestamp = now;
+
+      db.ref(`rooms/${roomCode}/cam2`).set({
+        landmarks: null,
+        time: now
+      });
+    }
+
+    function listenToCam2() {
+      const ref = db.ref(`rooms/${roomCode}/cam2`);
+      ref.on('value', (snap) => {
+        latestCam2Data = snap.val();
+        if (latestCam2Data && latestCam2Data.landmarks) {
+          debugLog.innerText = `Получен сигнал от Камеры 2 (${latestCam2Data.landmarks.length} точек)`;
+        }
+      }, (error) => {
+        debugLog.innerText = "Ошибка чтения БД: " + error.message;
+        dbBadge.className = "badge red";
+        dbBadge.innerText = "БД: ошибка прав";
+      });
+    }
+
+    // Главный цикл отрисовки
+    function renderLoop() {
+      if (videoElement.videoWidth) {
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+      }
+      ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+      if (currentRole === 'cam2') {
+        // Камера 2 просто показывает локальный скелет
+        if (localPersonDetected && lastLocalLandmarks) {
+          drawSkeleton(lastLocalLandmarks, '#ffffff', 2);
         }
       } else {
-        // Камера 1 — экран в первой комнате
-        if (hasLocalPerson) {
-          // Человек в первой комнате
-          drawSkeleton(results.poseLandmarks, '#4caf50', 2.5);
-          overlayInfo.innerText = "Камера 1: Человек в комнате 1";
-          statusBadge.innerText = "В поле зрения";
-          statusBadge.className = "badge active";
+        // Камера 1 (Главный экран)
+        if (localPersonDetected && lastLocalLandmarks) {
+          // Человек перед камерой 1
+          drawSkeleton(lastLocalLandmarks, '#4caf50', 2.5);
+          overlayInfo.innerText = "Камера 1: Человек перед экраном";
+          statusBadge.innerText = "В комнате 1";
+          statusBadge.className = "badge green";
         } else {
-          // Человек ушел из первой комнаты — проверяем вторую комнату из Firebase
-          if (lastCam2Data && (Date.now() - lastCam2Data.timestamp < 2500) && lastCam2Data.landmarks) {
-            // Рисуем силуэт человека за стенкой
-            drawSkeleton(lastCam2Data.landmarks, '#ff5252', 3, true);
-            overlayInfo.innerText = "Камера 1: Человек за стеной (Камера 2)";
-            statusBadge.innerText = "За стенкой";
-            statusBadge.className = "badge wall";
+          // Проверяем сигнал со второй камеры (за стеной)
+          const now = Date.now();
+          const isFresh = latestCam2Data && latestCam2Data.landmarks && (now - latestCam2Data.time < 3000);
+
+          if (isFresh) {
+            // Рисуем человека СКВОЗЬ СТЕНУ красным силуэтом
+            drawSkeleton(latestCam2Data.landmarks, '#ff3b30', 3, true);
+            overlayInfo.innerText = "СКВОЗЬ СТЕНУ: Человек во 2-й комнате";
+            statusBadge.innerText = "За стеной";
+            statusBadge.className = "badge red";
           } else {
-            overlayInfo.innerText = "Камера 1: Людей нет";
+            overlayInfo.innerText = "Камера 1: Человек не обнаружен";
             statusBadge.innerText = "Поиск";
             statusBadge.className = "badge";
           }
         }
       }
+
+      requestAnimationFrame(renderLoop);
     }
 
-    // Отправка легкого набора координат в Realtime Database (~20 FPS)
-    function sendPoseToFirebase(landmarks) {
-      const now = Date.now();
-      if (now - lastSendTime < 50) return;
-      lastSendTime = now;
-
-      // Берем основные ключевые точки, округляя до 3 знаков
-      const compressed = landmarks.map(pt => ({
-        x: Math.round(pt.x * 1000) / 1000,
-        y: Math.round(pt.y * 1000) / 1000,
-        v: Math.round((pt.visibility || 0) * 100) / 100
-      }));
-
-      db.ref(`rooms/${roomCode}/cam2`).set({
-        landmarks: compressed,
-        timestamp: now
-      });
-    }
-
-    function clearPoseInFirebase() {
-      const now = Date.now();
-      if (now - lastSendTime < 300) return;
-      lastSendTime = now;
-      db.ref(`rooms/${roomCode}/cam2`).set({
-        landmarks: null,
-        timestamp: now
-      });
-    }
-
-    function subscribeToCam2() {
-      if (remoteListenerRef) remoteListenerRef.off();
-      remoteListenerRef = db.ref(`rooms/${roomCode}/cam2`);
-      remoteListenerRef.on('value', (snapshot) => {
-        lastCam2Data = snapshot.val();
-      });
-    }
-
-    // Прорисовка линий и суставов силуэта
-    function drawSkeleton(landmarks, color, lineWidth, behindWall = false) {
+    function drawSkeleton(landmarks, color, lineWidth, throughWall = false) {
       const w = canvasElement.width;
       const h = canvasElement.height;
 
@@ -350,17 +396,15 @@
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
-      if (behindWall) {
-        // Небольшой полупрозрачный ореол для эффекта "сквозь стену"
+      if (throughWall) {
         ctx.shadowColor = color;
-        ctx.shadowBlur = 6;
+        ctx.shadowBlur = 8;
       }
 
-      // Линии между суставами
       for (const [start, end] of POSE_CONNECTIONS) {
         const p1 = landmarks[start];
         const p2 = landmarks[end];
-        if (p1 && p2 && (p1.v === undefined || p1.v > 0.4) && (p2.v === undefined || p2.v > 0.4)) {
+        if (p1 && p2 && (p1.v === undefined || p1.v > 0.3) && (p2.v === undefined || p2.v > 0.3)) {
           ctx.beginPath();
           ctx.moveTo(p1.x * w, p1.y * h);
           ctx.lineTo(p2.x * w, p2.y * h);
@@ -368,12 +412,11 @@
         }
       }
 
-      // Точки суставов и голова
-      landmarks.forEach((p, index) => {
-        if (p && (p.v === undefined || p.v > 0.4)) {
-          const r = index === 0 ? 7 : 3.5; // голова чуть больше
+      landmarks.forEach((p, idx) => {
+        if (p && (p.v === undefined || p.v > 0.3)) {
+          const radius = (idx === 0) ? 6 : 3;
           ctx.beginPath();
-          ctx.arc(p.x * w, p.y * h, r, 0, 2 * Math.PI);
+          ctx.arc(p.x * w, p.y * h, radius, 0, 2 * Math.PI);
           ctx.fill();
         }
       });
@@ -388,16 +431,16 @@
       startBtn.disabled = true;
       roleSelect.disabled = true;
       roomInput.disabled = true;
-      statusBadge.innerText = "Инициализация...";
 
       await initCamera();
       setupMediaPipe();
 
       if (currentRole === 'cam1') {
-        subscribeToCam2();
+        listenToCam2();
       }
 
-      requestAnimationFrame(detectionLoop);
+      requestAnimationFrame(processVideoFrame);
+      requestAnimationFrame(renderLoop);
     });
   </script>
 </body>
